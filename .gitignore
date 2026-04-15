@@ -1,0 +1,16 @@
+# secrets
+.env
+
+# data files
+data/raw/
+data/processed/
+data/logs/
+
+# python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code
+.vscode/
