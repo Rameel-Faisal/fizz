@@ -4,11 +4,16 @@ from typing import List, Optional
 from app.schemas.cultivation_data import CultivationCreate, CultivationOut, CultivationUpdate
 from app.crud.cultivation_data import (
     get_cultivation, get_cultivations, get_by_fiber,
-    get_by_region, create_cultivation, update_cultivation, delete_cultivation
+    get_by_region, create_cultivation, update_cultivation, delete_cultivation,create_cultivation_bulk
 )
 from app.dependencies.db import get_db
 
 router = APIRouter(prefix="/cultivation-data", tags=["Cultivation Data"])
+
+@router.post("bulk", response_model=list[CultivationOut], status_code=201)
+def create_cultivation_data_bulk(items: list[CultivationCreate], db: Session = Depends(get_db)):
+    return create_cultivation_bulk(db, items)
+ 
 
 @router.get("/", response_model=List[CultivationOut])
 def list_cultivations(

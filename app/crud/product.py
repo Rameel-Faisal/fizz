@@ -18,6 +18,31 @@ def create_product(db: Session, product: ProductCreate):
     db.refresh(db_product)
     return db_product
 
+def create_product_bulk(db: Session, items: list[ProductCreate]):
+    db_objects = [Product(**i.model_dump()) for i in items]
+    db.add_all(db_objects)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for obj in db_objects:
+        db.refresh(obj)
+    return db_objects
+
+def create_product_bulk(db: Session, items: list[ProductCreate]):
+    db_objects = [Product(**i.model_dump()) for i in items]
+    db.add_all(db_objects)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for obj in db_objects:
+        db.refresh(obj)
+    return db_objects
+ 
+
 def update_product(db: Session, db_product: Product, product: ProductUpdate):
     data = product.model_dump(exclude_unset=True)
     for field, value in data.items():

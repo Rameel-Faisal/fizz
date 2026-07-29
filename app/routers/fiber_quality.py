@@ -4,11 +4,16 @@ from typing import List
 from app.schemas.fiber_quality import FiberQualityCreate, FiberQualityOut, FiberQualityUpdate
 from app.crud.fiber_quality import (
     get_fiber_quality, get_fiber_qualities, get_by_fiber,
-    get_by_grade, create_fiber_quality, update_fiber_quality, delete_fiber_quality
+    get_by_grade, create_fiber_quality, update_fiber_quality, delete_fiber_quality,create_fiber_quality_bulk
 )
 from app.dependencies.db import get_db
 
 router = APIRouter(prefix="/fiber-quality", tags=["Fiber Quality"])
+
+@router.post("/bulk", response_model=list[FiberQualityOut], status_code=201)
+def create_fiber_quality_bulk(items: list[FiberQualityCreate], db: Session = Depends(get_db)):
+    return create_fiber_quality_bulk(db, items)
+ 
 
 @router.get("/", response_model=List[FiberQualityOut])
 def list_qualities(

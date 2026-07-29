@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
-from datetime import date
+
 
 class CultivationBase(BaseModel):
     fiber_id:int
@@ -9,7 +9,7 @@ class CultivationBase(BaseModel):
     farming_method:Optional[str]=None
     water_required:Optional[float]=None
     yield_amount:Optional[float]=None
-    harvest_date:Optional[date]=None
+    harvest_date:Optional[int]=None
     source:Optional[str]=None
 
 class CultivationCreate(CultivationBase):

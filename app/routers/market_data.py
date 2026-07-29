@@ -5,11 +5,16 @@ from app.schemas.market_data import MarketDataCreate, MarketDataOut, MarketDataU
 from app.crud.market_data import (
     get_market_data, get_market_data_list, get_by_fiber,
     get_by_industry, get_by_region,
-    create_market_data, update_market_data, delete_market_data
+    create_market_data, update_market_data, delete_market_data,create_market_data_bulk
 )
 from app.dependencies.db import get_db
 
 router = APIRouter(prefix="/market-data", tags=["Market Data"])
+
+@router.post("/bulk", response_model=list[MarketDataOut], status_code=201)
+def create_market_data_bulk(items: list[MarketDataCreate], db: Session = Depends(get_db)):
+    return create_market_data_bulk(db, items)
+ 
 
 @router.get("/", response_model=List[MarketDataOut])
 def list_market_data(

@@ -21,6 +21,18 @@ def create_sustainability_metric(db: Session, metric: SustainabilityMetricCreate
     db.refresh(db_metric)
     return db_metric
 
+def create_sustainability_metric_bulk(db: Session, metrics: list[SustainabilityMetricCreate]):
+    db_objects = [SustainabilityMetric(**m.model_dump()) for m in metrics]
+    db.add_all(db_objects)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for obj in db_objects:
+        db.refresh(obj)
+    return db_objects
+
 def update_sustainability_metric(db: Session, db_metric: SustainabilityMetric, metric: SustainabilityMetricUpdate):
     data = metric.model_dump(exclude_unset=True)
     for field, value in data.items():

@@ -18,6 +18,18 @@ def create_fiber_type(db: Session, fiber: FiberTypeCreate):
     db.refresh(db_fiber)  # reload to get the generated ID
     return db_fiber
 
+def create_fiber_type_bulk(db: Session, fibers: list[FiberTypeCreate]):
+    db_objects = [FiberType(**f.model_dump()) for f in fibers]
+    db.add_all(db_objects)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for obj in db_objects:
+        db.refresh(obj)
+    return db_objects
+
 def update_fiber_type(db: Session, db_fiber: FiberType, fiber: FiberTypeUpdate):
     # UPDATE - change existing row
     data = fiber.model_dump(exclude_unset=True)  # only update fields that were sent

@@ -5,11 +5,16 @@ from app.schemas.processing_method import ProcessingMethodCreate, ProcessingMeth
 from app.crud.processing_method import (
     get_processing_method, get_processing_methods, get_by_fiber,
     get_by_process_type, create_processing_method,
-    update_processing_method, delete_processing_method
+    update_processing_method, delete_processing_method,create_processing_method_bulk
 )
 from app.dependencies.db import get_db
 
 router = APIRouter(prefix="/processing-methods", tags=["Processing Methods"])
+
+@router.post("/bulk", response_model=list[ProcessingMethodOut], status_code=201)
+def create_processing_methods_bulk(items: list[ProcessingMethodCreate], db: Session = Depends(get_db)):
+    return create_processing_method_bulk(db, items)
+ 
 
 @router.get("/", response_model=List[ProcessingMethodOut])
 def list_methods(

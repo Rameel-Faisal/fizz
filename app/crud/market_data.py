@@ -24,6 +24,19 @@ def create_market_data(db: Session, market: MarketDataCreate):
     db.refresh(db_market)
     return db_market
 
+def create_market_data_bulk(db: Session, items: list[MarketDataCreate]):
+    db_objects = [MarketData(**i.model_dump()) for i in items]
+    db.add_all(db_objects)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for obj in db_objects:
+        db.refresh(obj)
+    return db_objects
+ 
+
 def update_market_data(db: Session, db_market: MarketData, market: MarketDataUpdate):
     data = market.model_dump(exclude_unset=True)
     for field, value in data.items():

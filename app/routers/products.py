@@ -4,11 +4,15 @@ from typing import List
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
 from app.crud.product import (
     get_product, get_products, get_by_fiber,
-    create_product, update_product, delete_product
+    create_product, update_product, delete_product,create_product_bulk,
 )
 from app.dependencies.db import get_db
 
 router = APIRouter(prefix="/products", tags=["Products"])
+
+@router.post("/bulk", response_model=list[ProductOut], status_code=201)
+def create_products_bulk(items: list[ProductCreate], db: Session = Depends(get_db)):
+    return create_product_bulk(db, items)
 
 @router.get("/", response_model=List[ProductOut])
 def list_products(

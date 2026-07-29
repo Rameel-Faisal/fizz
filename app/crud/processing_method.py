@@ -21,6 +21,19 @@ def create_processing_method(db: Session, method: ProcessingMethodCreate):
     db.refresh(db_method)
     return db_method
 
+def create_processing_method_bulk(db: Session, methods: list[ProcessingMethodCreate]):
+    db_objects = [ProcessingMethod(**m.model_dump()) for m in methods]
+    db.add_all(db_objects)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for obj in db_objects:
+        db.refresh(obj)
+    return db_objects
+ 
+
 def update_processing_method(db: Session, db_method: ProcessingMethod, method: ProcessingMethodUpdate):
     data = method.model_dump(exclude_unset=True)
     for field, value in data.items():

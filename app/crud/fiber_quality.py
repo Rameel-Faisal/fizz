@@ -23,6 +23,18 @@ def create_fiber_quality(db: Session, quality: FiberQualityCreate):
     db.refresh(db_quality)
     return db_quality
 
+def create_fiber_quality_bulk(db: Session, qualities: list[FiberQualityCreate]):
+    db_objects = [FiberQuality(**q.model_dump()) for q in qualities]
+    db.add_all(db_objects)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for obj in db_objects:
+        db.refresh(obj)
+    return db_objects
+ 
 def update_fiber_quality(db: Session, db_quality: FiberQuality, quality: FiberQualityUpdate):
     data = quality.model_dump(exclude_unset=True)
     for field, value in data.items():

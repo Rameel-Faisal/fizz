@@ -27,6 +27,19 @@ def create_cultivation(db: Session, cultivation: CultivationCreate):
     db.refresh(db_cultivation)
     return db_cultivation
 
+def create_cultivation_bulk(db: Session, items: list[CultivationCreate]):
+    db_objects = [CultivationData(**c.model_dump()) for c in items]
+    db.add_all(db_objects)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for obj in db_objects:
+        db.refresh(obj)
+    return db_objects
+ 
+
 def update_cultivation(db: Session, db_cultivation: CultivationData, cultivation: CultivationUpdate):
     data = cultivation.model_dump(exclude_unset=True)
     for field, value in data.items():
