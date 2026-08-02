@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.cultivation_data import CultivationData
 from app.schemas.cultivation_data import CultivationCreate, CultivationUpdate
+from sqlalchemy.exc import SQLAlchemyError
 
 def get_cultivation(db: Session, cultivation_id: int):
     return db.query(CultivationData).filter(
@@ -32,9 +33,9 @@ def create_cultivation_bulk(db: Session, items: list[CultivationCreate]):
     db.add_all(db_objects)
     try:
         db.commit()
-    except Exception:
+    except SQLAlchemyError as e:
         db.rollback()
-        raise
+        raise ValueError(f"Batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
     for obj in db_objects:
         db.refresh(obj)
     return db_objects

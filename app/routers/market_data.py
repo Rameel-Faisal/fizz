@@ -12,8 +12,11 @@ from app.dependencies.db import get_db
 router = APIRouter(prefix="/market-data", tags=["Market Data"])
 
 @router.post("/bulk", response_model=list[MarketDataOut], status_code=201)
-def create_market_data_bulk(items: list[MarketDataCreate], db: Session = Depends(get_db)):
-    return create_market_data_bulk(db, items)
+def create_market_data_bulk_route(items: list[MarketDataCreate], db: Session = Depends(get_db)):
+    try:
+        return create_market_data_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
  
 
 @router.get("/", response_model=List[MarketDataOut])

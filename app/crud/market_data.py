@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.market_data import MarketData
 from app.schemas.market_data import MarketDataCreate, MarketDataUpdate
+from sqlalchemy.exc import SQLAlchemyError 
 
 def get_market_data(db: Session, market_id: int):
     return db.query(MarketData).filter(MarketData.market_id == market_id).first()
@@ -24,14 +25,15 @@ def create_market_data(db: Session, market: MarketDataCreate):
     db.refresh(db_market)
     return db_market
 
+ 
 def create_market_data_bulk(db: Session, items: list[MarketDataCreate]):
     db_objects = [MarketData(**i.model_dump()) for i in items]
     db.add_all(db_objects)
     try:
         db.commit()
-    except Exception:
+    except SQLAlchemyError as e:
         db.rollback()
-        raise
+        raise ValueError(f"Batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
     for obj in db_objects:
         db.refresh(obj)
     return db_objects

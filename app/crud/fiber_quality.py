@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session
 from app.models.fiber_quality import FiberQuality
 from app.schemas.fiber_quality import FiberQualityCreate, FiberQualityUpdate
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import SQLAlchemyError
+
 
 def get_fiber_quality(db: Session, quality_id: int):
     return db.query(FiberQuality).filter(FiberQuality.quality_id == quality_id).first()
@@ -23,18 +26,20 @@ def create_fiber_quality(db: Session, quality: FiberQualityCreate):
     db.refresh(db_quality)
     return db_quality
 
-def create_fiber_quality_bulk(db: Session, qualities: list[FiberQualityCreate]):
-    db_objects = [FiberQuality(**q.model_dump()) for q in qualities]
+from sqlalchemy.exc import SQLAlchemyError
+
+def create_fiber_quality_bulk(db: Session, items: list[FiberQualityCreate]):
+    db_objects = [FiberQuality(**i.model_dump()) for i in items]
     db.add_all(db_objects)
     try:
         db.commit()
-    except Exception:
+    except SQLAlchemyError as e:
         db.rollback()
-        raise
+        raise ValueError(f"Batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
     for obj in db_objects:
         db.refresh(obj)
     return db_objects
- 
+
 def update_fiber_quality(db: Session, db_quality: FiberQuality, quality: FiberQualityUpdate):
     data = quality.model_dump(exclude_unset=True)
     for field, value in data.items():

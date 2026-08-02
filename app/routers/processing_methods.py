@@ -12,9 +12,11 @@ from app.dependencies.db import get_db
 router = APIRouter(prefix="/processing-methods", tags=["Processing Methods"])
 
 @router.post("/bulk", response_model=list[ProcessingMethodOut], status_code=201)
-def create_processing_methods_bulk(items: list[ProcessingMethodCreate], db: Session = Depends(get_db)):
-    return create_processing_method_bulk(db, items)
- 
+def create_processing_methods_bulk_route(items: list[ProcessingMethodCreate], db: Session = Depends(get_db)):
+    try:
+        return create_processing_method_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[ProcessingMethodOut])
 def list_methods(

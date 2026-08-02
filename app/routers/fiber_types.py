@@ -8,10 +8,12 @@ from app.dependencies.db import get_db
 
 router = APIRouter(prefix="/fiber-types", tags=["Fiber Types"])
 
-@router.post("bulk", response_model=list[FiberTypeOut], status_code=201)
-def create_fiber_types_bulk(items: list[FiberTypeCreate], db: Session = Depends(get_db)):
-    return create_fiber_type_bulk(db, items)
- 
+@router.post("/bulk", response_model=list[FiberTypeOut], status_code=201)
+def create_fiber_types_bulk_route(items: list[FiberTypeCreate], db: Session = Depends(get_db)):
+    try:
+        return create_fiber_type_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/", response_model=List[FiberTypeOut])

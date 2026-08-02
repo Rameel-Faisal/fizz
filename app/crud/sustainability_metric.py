@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.sustainability_metric import SustainabilityMetric
 from app.schemas.sustainability_metric import SustainabilityMetricCreate, SustainabilityMetricUpdate
+from sqlalchemy.exc import SQLAlchemyError 
 
 def get_sustainability_metric(db: Session, sustainability_id: int):
     return db.query(SustainabilityMetric).filter(SustainabilityMetric.sustainability_id == sustainability_id).first()
@@ -26,9 +27,9 @@ def create_sustainability_metric_bulk(db: Session, metrics: list[SustainabilityM
     db.add_all(db_objects)
     try:
         db.commit()
-    except Exception:
+    except SQLAlchemyError as e:
         db.rollback()
-        raise
+        raise ValueError(f"Batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
     for obj in db_objects:
         db.refresh(obj)
     return db_objects

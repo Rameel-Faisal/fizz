@@ -12,8 +12,11 @@ from app.dependencies.db import get_db
 router = APIRouter(prefix="/sustainability", tags=["Sustainability"])
 
 @router.post("/bulk", response_model=list[SustainabilityMetricOut], status_code=201)
-def create_sustainability_bulk(items: list[SustainabilityMetricCreate], db: Session = Depends(get_db)):
-    return create_sustainability_metric_bulk(db, items)
+def create_sustainability_bulk_route(items: list[SustainabilityMetricCreate], db: Session = Depends(get_db)):
+    try:
+        return create_sustainability_metric_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
  
 
 @router.get("/", response_model=List[SustainabilityMetricOut])

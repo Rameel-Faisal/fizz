@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate
+from sqlalchemy.exc import SQLAlchemyError 
 
 def get_product(db: Session, product_id: int):
     return db.query(Product).filter(Product.product_id == product_id).first()
@@ -35,9 +36,9 @@ def create_product_bulk(db: Session, items: list[ProductCreate]):
     db.add_all(db_objects)
     try:
         db.commit()
-    except Exception:
+    except SQLAlchemyError as e:
         db.rollback()
-        raise
+        raise ValueError(f"Batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
     for obj in db_objects:
         db.refresh(obj)
     return db_objects

@@ -11,9 +11,11 @@ from app.dependencies.db import get_db
 router = APIRouter(prefix="/fiber-quality", tags=["Fiber Quality"])
 
 @router.post("/bulk", response_model=list[FiberQualityOut], status_code=201)
-def create_fiber_quality_bulk(items: list[FiberQualityCreate], db: Session = Depends(get_db)):
-    return create_fiber_quality_bulk(db, items)
- 
+def create_fiber_quality_bulk_route(items: list[FiberQualityCreate], db: Session = Depends(get_db)):
+    try:
+        return create_fiber_quality_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[FiberQualityOut])
 def list_qualities(

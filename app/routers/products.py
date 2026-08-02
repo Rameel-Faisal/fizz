@@ -11,8 +11,11 @@ from app.dependencies.db import get_db
 router = APIRouter(prefix="/products", tags=["Products"])
 
 @router.post("/bulk", response_model=list[ProductOut], status_code=201)
-def create_products_bulk(items: list[ProductCreate], db: Session = Depends(get_db)):
-    return create_product_bulk(db, items)
+def create_products_bulk_route(items: list[ProductCreate], db: Session = Depends(get_db)):
+    try:
+        return create_product_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[ProductOut])
 def list_products(
