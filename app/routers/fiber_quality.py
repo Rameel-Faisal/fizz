@@ -4,7 +4,7 @@ from typing import List
 from app.schemas.fiber_quality import FiberQualityCreate, FiberQualityOut, FiberQualityUpdate
 from app.crud.fiber_quality import (
     get_fiber_quality, get_fiber_qualities, get_by_fiber,
-    get_by_grade, create_fiber_quality, update_fiber_quality, delete_fiber_quality,create_fiber_quality_bulk
+    get_by_grade, create_fiber_quality, update_fiber_quality, delete_fiber_quality,create_fiber_quality_bulk,upsert_fiber_quality_bulk
 )
 from app.dependencies.db import get_db
 
@@ -14,6 +14,13 @@ router = APIRouter(prefix="/fiber-quality", tags=["Fiber Quality"])
 def create_fiber_quality_bulk_route(items: list[FiberQualityCreate], db: Session = Depends(get_db)):
     try:
         return create_fiber_quality_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/upsert", status_code=200)
+def upsert_fiber_quality_route(items: list[FiberQualityCreate], db: Session = Depends(get_db)):
+    try:
+        return upsert_fiber_quality_bulk(db, items)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

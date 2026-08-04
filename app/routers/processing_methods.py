@@ -5,7 +5,7 @@ from app.schemas.processing_method import ProcessingMethodCreate, ProcessingMeth
 from app.crud.processing_method import (
     get_processing_method, get_processing_methods, get_by_fiber,
     get_by_process_type, create_processing_method,
-    update_processing_method, delete_processing_method,create_processing_method_bulk
+    update_processing_method, delete_processing_method,create_processing_method_bulk,upsert_processing_method_bulk
 )
 from app.dependencies.db import get_db
 
@@ -17,6 +17,14 @@ def create_processing_methods_bulk_route(items: list[ProcessingMethodCreate], db
         return create_processing_method_bulk(db, items)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/upsert", status_code=200)
+def upsert_processing_methods_route(items: list[ProcessingMethodCreate], db: Session = Depends(get_db)):
+    try:
+        return upsert_processing_method_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.get("/", response_model=List[ProcessingMethodOut])
 def list_methods(

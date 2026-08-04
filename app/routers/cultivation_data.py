@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.schemas.cultivation_data import CultivationCreate, CultivationOut, CultivationUpdate
 from app.crud.cultivation_data import (
     get_cultivation, get_cultivations, get_by_fiber,
-    get_by_region, create_cultivation, update_cultivation, delete_cultivation,create_cultivation_bulk
+    get_by_region, create_cultivation, update_cultivation, delete_cultivation,create_cultivation_bulk,upsert_cultivation_bulk
 )
 from app.dependencies.db import get_db
 
@@ -16,7 +16,14 @@ def create_cultivation_data_bulk_route(items: list[CultivationCreate], db: Sessi
         return create_cultivation_bulk(db, items)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+ 
+@router.post("/upsert", status_code=200)
+def upsert_cultivation_data_route(items: list[CultivationCreate], db: Session = Depends(get_db)):
+    try:
+        return upsert_cultivation_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))   
+ 
     
 @router.get("/", response_model=List[CultivationOut])
 def list_cultivations(

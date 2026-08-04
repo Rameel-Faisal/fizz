@@ -5,7 +5,7 @@ from app.schemas.sustainability_metric import SustainabilityMetricCreate, Sustai
 from app.crud.sustainability_metric import (
     get_sustainability_metric, get_sustainability_metrics, get_by_fiber,
     get_by_year, create_sustainability_metric,
-    update_sustainability_metric, delete_sustainability_metric,create_sustainability_metric_bulk
+    update_sustainability_metric, delete_sustainability_metric,create_sustainability_metric_bulk,upsert_sustainability_metric_bulk
 )
 from app.dependencies.db import get_db
 
@@ -15,6 +15,14 @@ router = APIRouter(prefix="/sustainability", tags=["Sustainability"])
 def create_sustainability_bulk_route(items: list[SustainabilityMetricCreate], db: Session = Depends(get_db)):
     try:
         return create_sustainability_metric_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/upsert", status_code=200)
+def upsert_sustainability_route(items: list[SustainabilityMetricCreate], db: Session = Depends(get_db)):
+    try:
+        return upsert_sustainability_metric_bulk(db, items)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
  

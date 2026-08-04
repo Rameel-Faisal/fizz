@@ -31,6 +31,31 @@ def create_product_bulk(db: Session, items: list[ProductCreate]):
         db.refresh(obj)
     return db_objects
 
+ 
+def upsert_product_bulk(db: Session, items: list[ProductCreate]):
+    inserted_count = 0
+    updated_count = 0
+    try:
+        for item in items:
+            data = item.model_dump()
+            existing = db.query(Product).filter(
+                Product.product_name == data["product_name"]
+            ).first()
+ 
+            if existing:
+                for field, value in data.items():
+                    setattr(existing, field, value)
+                updated_count += 1
+            else:
+                db.add(Product(**data))
+                inserted_count += 1
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise ValueError(f"Upsert batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
+    return {"inserted": inserted_count, "updated": updated_count, "total": inserted_count + updated_count}
+ 
+
 def create_product_bulk(db: Session, items: list[ProductCreate]):
     db_objects = [Product(**i.model_dump()) for i in items]
     db.add_all(db_objects)

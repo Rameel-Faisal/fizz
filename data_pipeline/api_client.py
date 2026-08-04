@@ -1,18 +1,3 @@
-# data_pipeline/api_client.py
-#
-# Sends cleaned rows to FastAPI via HTTP POST requests.
-# This is the only file that talks to your API.
-# All sources use these functions — never write directly to the DB.
-#
-# CHANGES FROM YOUR ORIGINAL:
-#   1. FIXED: post_row() now sends `clean_row` instead of the raw `row`
-#      (previously the NaN->None cleaning was computed but never used)
-#   2. ADDED: post_rows_bulk() — sends the whole batch in ONE HTTP request
-#      to a new /bulk endpoint, so the database can commit/rollback the
-#      entire import as a single transaction instead of row-by-row.
-#   3. post_rows() (your original per-row loop) is kept below, unchanged,
-#      in case you still want per-row posting for small/manual imports.
-#      run_pipeline.py should be pointed at post_rows_bulk() for normal use.
 
 import requests
 import json
@@ -203,6 +188,51 @@ def _bulk_summary(total, success, failed, import_log, error_log) -> dict:
         "import_log": str(import_log),
         "error_log": str(error_log) if failed > 0 else None
     }
+
+def post_rows_upsert(table: str, rows: list, source_name: str) -> dict:
+    """
+    Send the entire cleaned batch to /<table>/upsert instead of /<table>/bulk.
+    Each row is inserted if new, or updates the matching existing row if one
+    is found (based on that table's natural key). This is what makes
+    re-running the same import safe — no duplicate rows on a second run.
+    """
+    import_log, error_log = get_log_paths(source_name)
+    total = len(rows)
+    print(f"\n  Upserting {total} rows to /{table}/upsert (single transaction)")
+    print(f"  {'-' * 50}")
+
+    clean_rows = [sanitize_row(row) for row in rows]
+    url = f"{API_BASE_URL}/{table}/upsert"
+    timestamp = datetime.now().strftime("%H:%M:%S")
+
+    try:
+        response = requests.post(url, json=clean_rows, timeout=60)
+    except requests.exceptions.ConnectionError:
+        message = "connection failed — is FastAPI server running?"
+        write_log(import_log, f"[{timestamp}] FAILED — {message}")
+        return {"total": total, "inserted": 0, "updated": 0, "failed": total,
+                "import_log": str(import_log), "error_log": str(error_log)}
+
+    if response.status_code == 200:
+        result = response.json()
+        log_line = (f"[{timestamp}] SUCCESS — {result['inserted']} inserted, "
+                    f"{result['updated']} updated")
+        print(f"  {log_line}")
+        write_log(import_log, log_line)
+        return {"total": total, "inserted": result["inserted"],
+                "updated": result["updated"], "failed": 0,
+                "import_log": str(import_log), "error_log": None}
+    elif response.status_code == 400:
+        detail = response.json().get("detail", "unknown error")
+        write_log(import_log, f"[{timestamp}] FAILED — {detail}")
+        write_log(error_log, f"[{timestamp}] {detail}")
+        return {"total": total, "inserted": 0, "updated": 0, "failed": total,
+                "import_log": str(import_log), "error_log": str(error_log)}
+    else:
+        message = f"unexpected status {response.status_code}: {response.text}"
+        write_log(import_log, f"[{timestamp}] FAILED — {message}")
+        return {"total": total, "inserted": 0, "updated": 0, "failed": total,
+                "import_log": str(import_log), "error_log": str(error_log)}
 
 
 # ── ORIGINAL per-row batch function — kept for optional manual/small imports ──

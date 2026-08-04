@@ -1,6 +1,7 @@
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from data_pipeline.api_client import check_connection, post_rows_upsert, get_fiber_id_by_name
 
 import argparse
 from pathlib import Path
@@ -86,7 +87,7 @@ def move_to_processed(filepath: str):
 # ── Action: import ────────────────────────────────────────────────────────────
 
 def action_import(filepath: str, source_name: str):
-    from data_pipeline.api_client import check_connection, post_rows, get_fiber_id_by_name,post_rows_bulk
+    from data_pipeline.api_client import check_connection, post_rows_upsert, get_fiber_id_by_name
     from data_pipeline.config import get_mapping
     from data_pipeline.transform import clean_row
     from data_pipeline.sources.import_excel import load_and_map
@@ -156,12 +157,12 @@ def action_import(filepath: str, source_name: str):
 
                 # skip non-fiber categories defined in config
                 if fiber_name in skip_categories:
-                    skipped+=1
+                    skipped += 1
                     continue
-                
+
                 # apply fiber name map if one exists in config
                 # e.g. "Hemp" → "Hanf" for Eurostat data
-                
+
                 if fiber_name in fiber_name_map:
                     fiber_name = fiber_name_map[fiber_name]
                     # if mapped to None — skip this row entirely
@@ -179,14 +180,12 @@ def action_import(filepath: str, source_name: str):
                     skipped += 1
                     continue
 
-
             # inject all fixed fields from config
             fixed_fields = mapping.get("fixed_fields", {})
             for field, value in fixed_fields.items():
                 if field not in cleaned:
                     cleaned[field] = value
 
-            
             clean_rows.append(cleaned)
 
         except Exception as e:
@@ -202,10 +201,10 @@ def action_import(filepath: str, source_name: str):
         print("  ❌ No rows to import after cleaning.")
         sys.exit(1)
 
-    # ── Step 5: post to FastAPI ───────────────────────────────
+    # ── Step 5: post to FastAPI (UPSERT — insert new, update existing) ───────
     print()
-    print("  Step 4 — Posting to FastAPI...")
-    summary = post_rows_bulk(
+    print("  Step 4 — Upserting to FastAPI...")
+    summary = post_rows_upsert(
         table=table,
         rows=clean_rows,
         source_name=source_name
@@ -218,11 +217,12 @@ def action_import(filepath: str, source_name: str):
     # ── Final summary ─────────────────────────────────────────
     print("=" * 60)
     print("  IMPORT COMPLETE")
-    print(f"  Total:    {summary['total']}")
-    print(f"  Success:  {summary['success']} ✅")
-    print(f"  Failed:   {summary['failed']} ❌")
+    print(f"  Total:     {summary['total']}")
+    print(f"  Inserted:  {summary['inserted']} ✅")
+    print(f"  Updated:   {summary['updated']} 🔄")
+    print(f"  Failed:    {summary['failed']} ❌")
     if summary["error_log"]:
-        print(f"  Errors:   {summary['error_log']}")
+        print(f"  Errors:    {summary['error_log']}")
     print("=" * 60)
     print()
 

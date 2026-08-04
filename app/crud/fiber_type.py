@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.fiber_type import FiberType
 from app.schemas.fiber_type import FiberTypeCreate, FiberTypeUpdate
+from sqlalchemy.exc import SQLAlchemyError
 
 def get_fiber_type(db: Session, fiber_id: int):
     # READ one - find by ID
@@ -23,12 +24,37 @@ def create_fiber_type_bulk(db: Session, fibers: list[FiberTypeCreate]):
     db.add_all(db_objects)
     try:
         db.commit()
-    except Exception:
+    except SQLAlchemyError as e:
         db.rollback()
-        raise
+        raise ValueError(f"Batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
     for obj in db_objects:
         db.refresh(obj)
     return db_objects
+
+def upsert_fiber_type_bulk(db: Session, items: list[FiberTypeCreate]):
+    inserted_count = 0
+    updated_count = 0
+    try:
+        for item in items:
+            data = item.model_dump()
+            existing = db.query(FiberType).filter(
+                FiberType.fiber_type_name == data["fiber_type_name"]
+            ).first()
+ 
+            if existing:
+                for field, value in data.items():
+                    setattr(existing, field, value)
+                updated_count += 1
+            else:
+                db.add(FiberType(**data))
+                inserted_count += 1
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise ValueError(f"Upsert batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
+    return {"inserted": inserted_count, "updated": updated_count, "total": inserted_count + updated_count}
+
+
 
 def update_fiber_type(db: Session, db_fiber: FiberType, fiber: FiberTypeUpdate):
     # UPDATE - change existing row

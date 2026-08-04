@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError        
 from typing import List
 from app.schemas.fiber_type import FiberTypeCreate, FiberTypeOut, FiberTypeUpdate
-from app.crud.fiber_type import get_fiber_type, get_fiber_types, create_fiber_type, update_fiber_type, delete_fiber_type,create_fiber_type_bulk
+from app.crud.fiber_type import get_fiber_type, get_fiber_types, create_fiber_type, update_fiber_type, delete_fiber_type,create_fiber_type_bulk,upsert_fiber_type_bulk
 from app.dependencies.db import get_db
 
 router = APIRouter(prefix="/fiber-types", tags=["Fiber Types"])
@@ -15,6 +15,12 @@ def create_fiber_types_bulk_route(items: list[FiberTypeCreate], db: Session = De
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/upsert", status_code=200)
+def upsert_fiber_types_route(items: list[FiberTypeCreate], db: Session = Depends(get_db)):
+    try:
+        return upsert_fiber_type_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[FiberTypeOut])
 def list_fiber_types(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):

@@ -33,7 +33,36 @@ def create_processing_method_bulk(db: Session, methods: list[ProcessingMethodCre
     for obj in db_objects:
         db.refresh(obj)
     return db_objects
+
  
+def upsert_processing_method_bulk(db: Session, items: list[ProcessingMethodCreate]):
+    inserted_count = 0
+    updated_count = 0
+    try:
+        for item in items:
+            data = item.model_dump()
+            filters = [ProcessingMethod.fiber_id == data["fiber_id"]]
+ 
+            if data.get("process_type") is not None:
+                filters.append(ProcessingMethod.process_type == data["process_type"])
+            else:
+                filters.append(ProcessingMethod.process_type.is_(None))
+ 
+            existing = db.query(ProcessingMethod).filter(*filters).first()
+ 
+            if existing:
+                for field, value in data.items():
+                    setattr(existing, field, value)
+                updated_count += 1
+            else:
+                db.add(ProcessingMethod(**data))
+                inserted_count += 1
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise ValueError(f"Upsert batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
+    return {"inserted": inserted_count, "updated": updated_count, "total": inserted_count + updated_count}
+  
 
 def update_processing_method(db: Session, db_method: ProcessingMethod, method: ProcessingMethodUpdate):
     data = method.model_dump(exclude_unset=True)

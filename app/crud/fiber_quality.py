@@ -40,6 +40,41 @@ def create_fiber_quality_bulk(db: Session, items: list[FiberQualityCreate]):
         db.refresh(obj)
     return db_objects
 
+ 
+def upsert_fiber_quality_bulk(db: Session, items: list[FiberQualityCreate]):
+    inserted_count = 0
+    updated_count = 0
+    try:
+        for item in items:
+            data = item.model_dump()
+            filters = [FiberQuality.fiber_id == data["fiber_id"]]
+ 
+            if data.get("testing_date") is not None:
+                filters.append(FiberQuality.testing_date == data["testing_date"])
+            else:
+                filters.append(FiberQuality.testing_date.is_(None))
+ 
+            if data.get("source") is not None:
+                filters.append(FiberQuality.source == data["source"])
+            else:
+                filters.append(FiberQuality.source.is_(None))
+ 
+            existing = db.query(FiberQuality).filter(*filters).first()
+ 
+            if existing:
+                for field, value in data.items():
+                    setattr(existing, field, value)
+                updated_count += 1
+            else:
+                db.add(FiberQuality(**data))
+                inserted_count += 1
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise ValueError(f"Upsert batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
+    return {"inserted": inserted_count, "updated": updated_count, "total": inserted_count + updated_count}
+ 
+
 def update_fiber_quality(db: Session, db_quality: FiberQuality, quality: FiberQualityUpdate):
     data = quality.model_dump(exclude_unset=True)
     for field, value in data.items():

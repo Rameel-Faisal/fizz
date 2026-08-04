@@ -22,6 +22,36 @@ def create_sustainability_metric(db: Session, metric: SustainabilityMetricCreate
     db.refresh(db_metric)
     return db_metric
 
+def upsert_sustainability_metric_bulk(db: Session, items: list[SustainabilityMetricCreate]):
+    inserted_count = 0
+    updated_count = 0
+    try:
+        for item in items:
+            data = item.model_dump()
+            filters = [SustainabilityMetric.fiber_id == data["fiber_id"]]
+ 
+            if data.get("year") is not None:
+                filters.append(SustainabilityMetric.year == data["year"])
+            else:
+                filters.append(SustainabilityMetric.year.is_(None))
+ 
+            existing = db.query(SustainabilityMetric).filter(*filters).first()
+ 
+            if existing:
+                for field, value in data.items():
+                    setattr(existing, field, value)
+                updated_count += 1
+            else:
+                db.add(SustainabilityMetric(**data))
+                inserted_count += 1
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise ValueError(f"Upsert batch rejected — database constraint violation: {str(e.orig) if hasattr(e, 'orig') else str(e)}")
+    return {"inserted": inserted_count, "updated": updated_count, "total": inserted_count + updated_count}
+ 
+
+
 def create_sustainability_metric_bulk(db: Session, metrics: list[SustainabilityMetricCreate]):
     db_objects = [SustainabilityMetric(**m.model_dump()) for m in metrics]
     db.add_all(db_objects)

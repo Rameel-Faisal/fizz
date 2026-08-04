@@ -4,7 +4,7 @@ from typing import List
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
 from app.crud.product import (
     get_product, get_products, get_by_fiber,
-    create_product, update_product, delete_product,create_product_bulk,
+    create_product, update_product, delete_product,create_product_bulk,upsert_product_bulk
 )
 from app.dependencies.db import get_db
 
@@ -16,6 +16,13 @@ def create_products_bulk_route(items: list[ProductCreate], db: Session = Depends
         return create_product_bulk(db, items)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+@router.post("/upsert", status_code=200)
+def upsert_products_route(items: list[ProductCreate], db: Session = Depends(get_db)):
+    try:
+        return upsert_product_bulk(db, items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+ 
 
 @router.get("/", response_model=List[ProductOut])
 def list_products(
