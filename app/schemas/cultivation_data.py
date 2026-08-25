@@ -3,14 +3,16 @@ from typing import Optional
 
 
 class CultivationBase(BaseModel):
-    fiber_id:int
-    region:Optional[str]=None
-    soil_type:Optional[str]=None
-    farming_method:Optional[str]=None
-    water_required:Optional[float]=None
-    yield_amount:Optional[float]=None
-    harvest_date:Optional[int]=None
-    source:Optional[str]=None
+    fiber_id: int
+    country: Optional[str] = None        # ADD
+    region: Optional[str] = None
+    soil_type: Optional[str] = None
+    farming_method: Optional[str] = None
+    water_required: Optional[float] = None
+    yield_amount: Optional[float] = None
+    yield_unit: Optional[str] = None     # ADD
+    harvest_date: Optional[int] = None
+    source: Optional[str] = None
 
 class CultivationCreate(CultivationBase):
     pass
