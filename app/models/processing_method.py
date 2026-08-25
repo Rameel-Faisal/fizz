@@ -7,7 +7,7 @@ class ProcessingMethod(Base,TimestampMixin):
 
     processing_id = Column(Integer, primary_key=True, index=True)
     fiber_id = Column(Integer, ForeignKey("fiber_types.fiber_id"), nullable=False, index=True)
-    process_type = Column(String(80), nullable=True)
+    process_type = Column(String(500), nullable=True)
     energy_required = Column(Numeric(12, 2), nullable=True)
     chemicals_used = Column(Text, nullable=True)
     source = Column(Text, nullable=True)

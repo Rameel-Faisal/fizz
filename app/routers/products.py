@@ -7,17 +7,18 @@ from app.crud.product import (
     create_product, update_product, delete_product,create_product_bulk,upsert_product_bulk
 )
 from app.dependencies.db import get_db
+from app.dependencies.auth import verify_api_key
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
 @router.post("/bulk", response_model=list[ProductOut], status_code=201)
-def create_products_bulk_route(items: list[ProductCreate], db: Session = Depends(get_db)):
+def create_products_bulk_route(items: list[ProductCreate], db: Session = Depends(get_db),api_key: str = Depends(verify_api_key)):
     try:
         return create_product_bulk(db, items)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 @router.post("/upsert", status_code=200)
-def upsert_products_route(items: list[ProductCreate], db: Session = Depends(get_db)):
+def upsert_products_route(items: list[ProductCreate], db: Session = Depends(get_db),api_key: str = Depends(verify_api_key)):
     try:
         return upsert_product_bulk(db, items)
     except ValueError as e:
@@ -36,7 +37,7 @@ def list_products(
     return get_products(db, skip=skip, limit=limit)
 
 @router.post("/", response_model=ProductOut, status_code=201)
-def create(payload: ProductCreate, db: Session = Depends(get_db)):
+def create(payload: ProductCreate, db: Session = Depends(get_db),api_key: str = Depends(verify_api_key)):
     return create_product(db, payload)
 
 @router.get("/{product_id}", response_model=ProductOut)
@@ -47,14 +48,14 @@ def get_one(product_id: int, db: Session = Depends(get_db)):
     return obj
 
 @router.patch("/{product_id}", response_model=ProductOut)
-def update(product_id: int, payload: ProductUpdate, db: Session = Depends(get_db)):
+def update(product_id: int, payload: ProductUpdate, db: Session = Depends(get_db),api_key: str = Depends(verify_api_key)):
     obj = get_product(db, product_id)
     if not obj:
         raise HTTPException(status_code=404, detail="Product not found")
     return update_product(db, obj, payload)
 
 @router.delete("/{product_id}", status_code=204)
-def delete(product_id: int, db: Session = Depends(get_db)):
+def delete(product_id: int, db: Session = Depends(get_db),api_key: str = Depends(verify_api_key)):
     obj = get_product(db, product_id)
     if not obj:
         raise HTTPException(status_code=404, detail="Product not found")

@@ -7,18 +7,20 @@ from app.crud.fiber_quality import (
     get_by_grade, create_fiber_quality, update_fiber_quality, delete_fiber_quality,create_fiber_quality_bulk,upsert_fiber_quality_bulk
 )
 from app.dependencies.db import get_db
+from app.dependencies.auth import verify_api_key
+
 
 router = APIRouter(prefix="/fiber-quality", tags=["Fiber Quality"])
 
 @router.post("/bulk", response_model=list[FiberQualityOut], status_code=201)
-def create_fiber_quality_bulk_route(items: list[FiberQualityCreate], db: Session = Depends(get_db)):
+def create_fiber_quality_bulk_route(items: list[FiberQualityCreate], db: Session = Depends(get_db), api_key: str = Depends(verify_api_key) ):
     try:
         return create_fiber_quality_bulk(db, items)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/upsert", status_code=200)
-def upsert_fiber_quality_route(items: list[FiberQualityCreate], db: Session = Depends(get_db)):
+def upsert_fiber_quality_route(items: list[FiberQualityCreate], db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
     try:
         return upsert_fiber_quality_bulk(db, items)
     except ValueError as e:
@@ -39,7 +41,7 @@ def list_qualities(
     return get_fiber_qualities(db, skip=skip, limit=limit)
 
 @router.post("/", response_model=FiberQualityOut, status_code=201)
-def create(payload: FiberQualityCreate, db: Session = Depends(get_db)):
+def create(payload: FiberQualityCreate, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
     return create_fiber_quality(db, payload)
 
 @router.get("/{quality_id}", response_model=FiberQualityOut)
@@ -50,14 +52,14 @@ def get_one(quality_id: int, db: Session = Depends(get_db)):
     return obj
 
 @router.patch("/{quality_id}", response_model=FiberQualityOut)
-def update(quality_id: int, payload: FiberQualityUpdate, db: Session = Depends(get_db)):
+def update(quality_id: int, payload: FiberQualityUpdate, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
     obj = get_fiber_quality(db, quality_id)
     if not obj:
         raise HTTPException(status_code=404, detail="Not found")
     return update_fiber_quality(db, obj, payload)
 
 @router.delete("/{quality_id}", status_code=204)
-def delete(quality_id: int, db: Session = Depends(get_db)):
+def delete(quality_id: int, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
     delete_fiber_quality(db, quality_id)
 # ```
 

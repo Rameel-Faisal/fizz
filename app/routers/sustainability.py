@@ -8,11 +8,12 @@ from app.crud.sustainability_metric import (
     update_sustainability_metric, delete_sustainability_metric,create_sustainability_metric_bulk,upsert_sustainability_metric_bulk
 )
 from app.dependencies.db import get_db
+from app.dependencies.auth import verify_api_key
 
 router = APIRouter(prefix="/sustainability", tags=["Sustainability"])
 
 @router.post("/bulk", response_model=list[SustainabilityMetricOut], status_code=201)
-def create_sustainability_bulk_route(items: list[SustainabilityMetricCreate], db: Session = Depends(get_db)):
+def create_sustainability_bulk_route(items: list[SustainabilityMetricCreate], db: Session = Depends(get_db) ,api_key: str = Depends(verify_api_key)):
     try:
         return create_sustainability_metric_bulk(db, items)
     except ValueError as e:
@@ -20,7 +21,7 @@ def create_sustainability_bulk_route(items: list[SustainabilityMetricCreate], db
 
 
 @router.post("/upsert", status_code=200)
-def upsert_sustainability_route(items: list[SustainabilityMetricCreate], db: Session = Depends(get_db)):
+def upsert_sustainability_route(items: list[SustainabilityMetricCreate], db: Session = Depends(get_db) ,api_key: str = Depends(verify_api_key)):
     try:
         return upsert_sustainability_metric_bulk(db, items)
     except ValueError as e:
@@ -42,7 +43,7 @@ def list_metrics(
     return get_sustainability_metrics(db, skip=skip, limit=limit)
 
 @router.post("/", response_model=SustainabilityMetricOut, status_code=201)
-def create(payload: SustainabilityMetricCreate, db: Session = Depends(get_db)):
+def create(payload: SustainabilityMetricCreate, db: Session = Depends(get_db) ,api_key: str = Depends(verify_api_key)):
     return create_sustainability_metric(db, payload)
 
 @router.get("/{sustainability_id}", response_model=SustainabilityMetricOut)
@@ -53,14 +54,14 @@ def get_one(sustainability_id: int, db: Session = Depends(get_db)):
     return obj
 
 @router.patch("/{sustainability_id}", response_model=SustainabilityMetricOut)
-def update(sustainability_id: int, payload: SustainabilityMetricUpdate, db: Session = Depends(get_db)):
+def update(sustainability_id: int, payload: SustainabilityMetricUpdate, db: Session = Depends(get_db) ,api_key: str = Depends(verify_api_key)):
     obj = get_sustainability_metric(db, sustainability_id)
     if not obj:
         raise HTTPException(status_code=404, detail="Sustainability metric not found")
     return update_sustainability_metric(db, obj, payload)
 
 @router.delete("/{sustainability_id}", status_code=204)
-def delete(sustainability_id: int, db: Session = Depends(get_db)):
+def delete(sustainability_id: int, db: Session = Depends(get_db),api_key: str = Depends(verify_api_key) ):
     obj = get_sustainability_metric(db, sustainability_id)
     if not obj:
         raise HTTPException(status_code=404, detail="Sustainability metric not found")

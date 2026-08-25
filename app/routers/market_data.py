@@ -8,18 +8,19 @@ from app.crud.market_data import (
     create_market_data, update_market_data, delete_market_data,create_market_data_bulk,upsert_market_data_bulk
 )
 from app.dependencies.db import get_db
+from app.dependencies.auth import verify_api_key
 
 router = APIRouter(prefix="/market-data", tags=["Market Data"])
 
 @router.post("/bulk", response_model=list[MarketDataOut], status_code=201)
-def create_market_data_bulk_route(items: list[MarketDataCreate], db: Session = Depends(get_db)):
+def create_market_data_bulk_route(items: list[MarketDataCreate], db: Session = Depends(get_db) ,api_key: str = Depends(verify_api_key)):
     try:
         return create_market_data_bulk(db, items)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
  
 @router.post("/upsert", status_code=200)
-def upsert_market_data_route(items: list[MarketDataCreate], db: Session = Depends(get_db)):
+def upsert_market_data_route(items: list[MarketDataCreate], db: Session = Depends(get_db),api_key: str = Depends(verify_api_key)):
     try:
         return upsert_market_data_bulk(db, items)
     except ValueError as e:
@@ -44,7 +45,7 @@ def list_market_data(
     return get_market_data_list(db, skip=skip, limit=limit)
 
 @router.post("/", response_model=MarketDataOut, status_code=201)
-def create(payload: MarketDataCreate, db: Session = Depends(get_db)):
+def create(payload: MarketDataCreate, db: Session = Depends(get_db),api_key: str = Depends(verify_api_key)):
     return create_market_data(db, payload)
 
 @router.get("/{market_id}", response_model=MarketDataOut)
@@ -55,14 +56,14 @@ def get_one(market_id: int, db: Session = Depends(get_db)):
     return obj
 
 @router.patch("/{market_id}", response_model=MarketDataOut)
-def update(market_id: int, payload: MarketDataUpdate, db: Session = Depends(get_db)):
+def update(market_id: int, payload: MarketDataUpdate, db: Session = Depends(get_db),api_key: str = Depends(verify_api_key)):
     obj = get_market_data(db, market_id)
     if not obj:
         raise HTTPException(status_code=404, detail="Market data not found")
     return update_market_data(db, obj, payload)
 
 @router.delete("/{market_id}", status_code=204)
-def delete(market_id: int, db: Session = Depends(get_db)):
+def delete(market_id: int, db: Session = Depends(get_db),api_key: str = Depends(verify_api_key)):
     obj = get_market_data(db, market_id)
     if not obj:
         raise HTTPException(status_code=404, detail="Market data not found")

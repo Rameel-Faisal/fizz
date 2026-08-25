@@ -1,4 +1,3 @@
-
 import requests
 import json
 import os
@@ -12,6 +11,7 @@ load_dotenv()
 # ── Config ────────────────────────────────────────────────────────────────────
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+PIPELINE_API_KEY = os.getenv("FIZZ_PIPELINE_API_KEY", "")
 
 # where logs get saved
 LOG_DIR = Path("data/logs/imports")
@@ -51,6 +51,16 @@ def sanitize_row(row: dict) -> dict:
     }
 
 
+def get_auth_headers() -> dict:
+    """
+    Returns the headers dict every write request needs to include, now that
+    write endpoints require an API key. Pulled into one function so all
+    three POST functions below stay consistent — change the key handling
+    once here, not three times.
+    """
+    return {"X-API-Key": PIPELINE_API_KEY}
+
+
 # ── Core single-row POST function (fixed) ─────────────────────────────────────
 
 def post_row(table: str, row: dict) -> tuple:
@@ -64,11 +74,13 @@ def post_row(table: str, row: dict) -> tuple:
     """
     url = f"{API_BASE_URL}/{table}"
     clean_row = sanitize_row(row)
+    headers = get_auth_headers()  # ADDED
 
     try:
         response = requests.post(
             url,
             json=clean_row,   # FIXED: was `json=row` — NaN values could reach the API
+            headers=headers,  # ADDED
             timeout=10
         )
 
@@ -79,6 +91,9 @@ def post_row(table: str, row: dict) -> tuple:
                 "?"
             )
             return True, f"inserted (id: {created_id})"
+
+        elif response.status_code == 401:  # ADDED
+            return False, "authentication failed — check FIZZ_PIPELINE_API_KEY in .env"
 
         elif response.status_code == 422:
             errors = response.json().get("detail", "unknown validation error")
@@ -100,20 +115,22 @@ def post_row(table: str, row: dict) -> tuple:
         return False, f"unexpected error: {str(e)}"
 
 
-# ── NEW: Bulk POST function — one transaction for the whole file ─────────────
+# ── Bulk POST function — one transaction for the whole file ──────────────────
 
 def post_rows_bulk(table: str, rows: list, source_name: str) -> dict:
     """
     Send the ENTIRE list of cleaned rows to FastAPI in a single HTTP request,
-    hitting a new bulk endpoint (e.g. POST /market-data/bulk).
+    hitting the bulk endpoint (e.g. POST /market-data/bulk).
 
     The API side wraps this in one database transaction: either every row
-    in the batch commits, or none of them do (rollback). This replaces the
-    previous behaviour of one commit per row.
+    in the batch commits, or none of them do (rollback).
+
+    Kept for reference / direct use if you ever need plain insert-only
+    behaviour — normal pipeline runs use post_rows_upsert() below instead,
+    since that also solves the duplicate-import problem.
 
     table       -> API endpoint name e.g. "market-data"
-    rows        -> list of already-cleaned dicts (post clean_row(), post
-                   fiber_id resolution, post skip_categories filtering)
+    rows        -> list of already-cleaned dicts
     source_name -> used for log file naming
 
     Returns summary dict with counts.
@@ -127,10 +144,11 @@ def post_rows_bulk(table: str, rows: list, source_name: str) -> dict:
 
     clean_rows = [sanitize_row(row) for row in rows]
     url = f"{API_BASE_URL}/{table}/bulk"
+    headers = get_auth_headers()  # ADDED
     timestamp = datetime.now().strftime("%H:%M:%S")
 
     try:
-        response = requests.post(url, json=clean_rows, timeout=60)
+        response = requests.post(url, json=clean_rows, headers=headers, timeout=60)  # headers ADDED
     except requests.exceptions.ConnectionError:
         message = "connection failed — is FastAPI server running?"
         write_log(import_log, f"[{timestamp}] FAILED (all {total} rows) — {message}")
@@ -148,6 +166,13 @@ def post_rows_bulk(table: str, rows: list, source_name: str) -> dict:
         print(f"  {log_line}")
         write_log(import_log, log_line)
         return _bulk_summary(total, total, 0, import_log, error_log)
+
+    elif response.status_code == 401:  # ADDED
+        message = "authentication failed — check FIZZ_PIPELINE_API_KEY in .env"
+        print(f"  FAILED — {message}")
+        write_log(import_log, f"[{timestamp}] FAILED — {message}")
+        write_log(error_log, f"[{timestamp}] {message}")
+        return _bulk_summary(total, 0, total, import_log, error_log)
 
     elif response.status_code == 422:
         # validation failed — API rolled back, nothing was inserted
@@ -189,12 +214,17 @@ def _bulk_summary(total, success, failed, import_log, error_log) -> dict:
         "error_log": str(error_log) if failed > 0 else None
     }
 
+
+# ── Upsert POST function — insert new rows, update existing ones ─────────────
+
 def post_rows_upsert(table: str, rows: list, source_name: str) -> dict:
     """
     Send the entire cleaned batch to /<table>/upsert instead of /<table>/bulk.
     Each row is inserted if new, or updates the matching existing row if one
     is found (based on that table's natural key). This is what makes
     re-running the same import safe — no duplicate rows on a second run.
+
+    This is what run_pipeline.py calls for all normal imports.
     """
     import_log, error_log = get_log_paths(source_name)
     total = len(rows)
@@ -203,13 +233,21 @@ def post_rows_upsert(table: str, rows: list, source_name: str) -> dict:
 
     clean_rows = [sanitize_row(row) for row in rows]
     url = f"{API_BASE_URL}/{table}/upsert"
+    headers = get_auth_headers()  # ADDED
     timestamp = datetime.now().strftime("%H:%M:%S")
 
     try:
-        response = requests.post(url, json=clean_rows, timeout=60)
+        response = requests.post(url, json=clean_rows, headers=headers, timeout=60)  # headers ADDED
     except requests.exceptions.ConnectionError:
         message = "connection failed — is FastAPI server running?"
         write_log(import_log, f"[{timestamp}] FAILED — {message}")
+        write_log(error_log, f"[{timestamp}] {message}")
+        return {"total": total, "inserted": 0, "updated": 0, "failed": total,
+                "import_log": str(import_log), "error_log": str(error_log)}
+    except requests.exceptions.Timeout:
+        message = "upsert request timed out after 60 seconds"
+        write_log(import_log, f"[{timestamp}] FAILED — {message}")
+        write_log(error_log, f"[{timestamp}] {message}")
         return {"total": total, "inserted": 0, "updated": 0, "failed": total,
                 "import_log": str(import_log), "error_log": str(error_log)}
 
@@ -222,15 +260,26 @@ def post_rows_upsert(table: str, rows: list, source_name: str) -> dict:
         return {"total": total, "inserted": result["inserted"],
                 "updated": result["updated"], "failed": 0,
                 "import_log": str(import_log), "error_log": None}
+
+    elif response.status_code == 401:  # ADDED
+        message = "authentication failed — check FIZZ_PIPELINE_API_KEY in .env"
+        print(f"  FAILED — {message}")
+        write_log(import_log, f"[{timestamp}] FAILED — {message}")
+        write_log(error_log, f"[{timestamp}] {message}")
+        return {"total": total, "inserted": 0, "updated": 0, "failed": total,
+                "import_log": str(import_log), "error_log": str(error_log)}
+
     elif response.status_code == 400:
         detail = response.json().get("detail", "unknown error")
         write_log(import_log, f"[{timestamp}] FAILED — {detail}")
         write_log(error_log, f"[{timestamp}] {detail}")
         return {"total": total, "inserted": 0, "updated": 0, "failed": total,
                 "import_log": str(import_log), "error_log": str(error_log)}
+
     else:
         message = f"unexpected status {response.status_code}: {response.text}"
         write_log(import_log, f"[{timestamp}] FAILED — {message}")
+        write_log(error_log, f"[{timestamp}] {message}")
         return {"total": total, "inserted": 0, "updated": 0, "failed": total,
                 "import_log": str(import_log), "error_log": str(error_log)}
 
@@ -241,7 +290,6 @@ def post_rows(table: str, rows: list, source_name: str) -> dict:
     """
     Send a list of cleaned rows to FastAPI ONE AT A TIME.
     Kept for small manual imports where per-row commit is acceptable.
-    For normal pipeline runs, prefer post_rows_bulk() above.
     """
     import_log, error_log = get_log_paths(source_name)
 
@@ -254,7 +302,7 @@ def post_rows(table: str, rows: list, source_name: str) -> dict:
     print(f"  {'-' * 50}")
 
     for i, row in enumerate(rows, start=1):
-        success, message = post_row(table, row)
+        success, message = post_row(table, row)  # already sends auth headers internally
         timestamp = datetime.now().strftime("%H:%M:%S")
 
         if success:
@@ -293,6 +341,7 @@ def check_connection() -> bool:
     """
     Ping the FastAPI server before starting an import.
     Gives a clear error if server is not running.
+    GET / is not a protected route, so no auth header is needed here.
     """
     try:
         response = requests.get(API_BASE_URL, timeout=5)
@@ -301,16 +350,15 @@ def check_connection() -> bool:
     except requests.exceptions.ConnectionError:
         print(f"  Cannot connect to FastAPI at {API_BASE_URL}")
         return False
-    
-    
+
+
 def get_fiber_id_by_name(fiber_name: str) -> int | None:
     """
     Look up fiber_id from fiber_types table by name.
     Used when importing child tables that need fiber_id.
 
-    "Abaca" → 6
-    "Hemp"  → 7
-    Returns None if not found.
+    GET /fiber-types is not a protected route, so no auth header is
+    needed here either — reads stay public per the auth design.
     """
     try:
         response = requests.get(
@@ -324,4 +372,4 @@ def get_fiber_id_by_name(fiber_name: str) -> int | None:
                     return fiber["fiber_id"]
         return None
     except Exception:
-        return None    
+        return None
